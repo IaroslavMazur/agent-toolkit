@@ -699,7 +699,19 @@ impl Coordinator {
                         current: self.clock.wall(),
                     })
                     .collect::<Vec<_>>();
-                store.replace_claude_sessions(&updates)?;
+                let alive = process_sweep(
+                    self.probe.as_ref(),
+                    store
+                        .sessions()?
+                        .into_iter()
+                        .filter(|row| row.identity.client == Client::Claude)
+                        .map(|row| (row.identity, row.fingerprint)),
+                )
+                .into_iter()
+                .filter(|observation| observation.liveness == ProcessLiveness::Alive)
+                .map(|observation| observation.identity.session_id)
+                .collect::<HashSet<_>>();
+                store.replace_claude_sessions(&updates, &alive)?;
                 unknown_clients = self.reconcile_processes(store)?;
             }
             if observation.result.complete {
